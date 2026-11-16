@@ -29,12 +29,9 @@ def izracunaj_parni_naklad(vozilo, n_std, n_vec, n_pos, n_2m, n_29m, pal_std, pa
     Napredni algoritem za parno zlaganje, ki pravilno 'štosa' dvonivojske palete
     in kombinira krajše palete za zapolnitev preostalega prostora.
     """
-    # Najprej pretvorimo kose v talna mesta (vrste), saj se 2m in 2.9m zlagata vedno po 2 kosa v višino
-    # Vsak par dveh kosov zasede 1 talno mesto na eni strani (levo ali desno)
     mesta_29m = math.ceil(n_29m / 2)
     mesta_2m = math.ceil(n_2m / 2)
     
-    # Ustvarimo seznam vseh talnih mest, ki jih moramo postaviti (z informacijo o kosih na njih)
     talna_mesta = []
     
     # Dodamo mesta za 2.9-Metrske
@@ -51,12 +48,12 @@ def izracunaj_parni_naklad(vozilo, n_std, n_vec, n_pos, n_2m, n_29m, pal_std, pa
         talna_mesta.append({'paleta': pal_2m, 'kosi': kosi})
         za_razdelit_2m -= kosi
         
-    # Enonivojske palete zasedejo vsaka svoje talno mesto (1 kos = 1 mesto)
+    # Enonivojske palete zasedejo vsaka svoje talno mesto
     for _ in range(n_pos): talna_mesta.append({'paleta': pal_pos, 'kosi': 1})
     for _ in range(n_vec): talna_mesta.append({'paleta': pal_vec, 'kosi': 1})
     for _ in range(n_std): talna_mesta.append({'paleta': pal_std, 'kosi': 1})
     
-    # Razvrstimo talna mesta od najdaljših proti najkrajšim za optimalno zapolnjevanje stene
+    # Razvrstimo talna mesta od najdaljših proti najkrajšim
     talna_mesta = sorted(talna_mesta, key=lambda x: x['paleta'].poraba_dolzine, reverse=True)
     
     izbrane_palete = []
@@ -65,12 +62,9 @@ def izracunaj_parni_naklad(vozilo, n_std, n_vec, n_pos, n_2m, n_29m, pal_std, pa
     trenutni_x = 0
     
     while len(talna_mesta) > 0:
-        # Vzamemo najdaljše razpoložljivo mesto za levo stran
         mesto1 = talna_mesta.pop(0)
         p1 = mesto1['paleta']
         
-        # Iskanje najboljšega para za desno stran, ki se ujema po dolžini ali je krajši,
-        # da maksimalno zapolnimo širino tovornjaka brez praznin
         indeks_para = -1
         for idx, m_potencialni in enumerate(talna_mesta):
             if m_potencialni['paleta'].poraba_dolzine <= p1.poraba_dolzine:
@@ -80,30 +74,26 @@ def izracunaj_parni_naklad(vozilo, n_std, n_vec, n_pos, n_2m, n_29m, pal_std, pa
         mesto2 = talna_mesta.pop(indeks_para) if indeks_para != -1 else None
         p2 = mesto2['paleta'] if mesto2 else None
         
-        # Dolžina te celotne vrste je določena z najdaljšo paleto v paru (večinoma p1)
         potrebna_dolzina = p1.poraba_dolzine
         
-        # Preverimo, ali vrsta sploh še paše po dolžini v vozilo
         if trenutni_x + potrebna_dolzina <= vozilo.dolzina:
             # Naložimo LEVO stran
             for nivo in range(1, mesto1['kosi'] + 1):
-                izbrane_palete.append((trenutni_x, 0, p1.poraba_dolzine, 120, nivo, p1.ime, p1.bar))
+                izbrane_palete.append((trenutni_x, 0, p1.poraba_dolzine, 120, nivo, p1.ime, p1.barva))
                 
-            # Naložimo DESNO stran (če obstaja sopotnik v vrsti)
+            # Naložimo DESNO stran
             if mesto2:
                 for nivo in range(1, mesto2['kosi'] + 1):
                     izbrane_palete.append((trenutni_x, 120, p2.poraba_dolzine, 120, nivo, p2.ime, p2.barva))
                     
-            trenutni_x += necesaria_dolzina
+            trenutni_x += potrebna_dolzina
         else:
-            # Če ne paše več, vrnemo mesta nazaj v preostanek
             preostanek_tovora_mesta.append(mesto1)
             if mesto2:
                 preostanek_tovora_mesta.append(mesto2)
             preostanek_tovora_mesta.extend(talna_mesta)
             break
             
-    # Preostanek mest nazaj pretvorimo v število kosov za izpis napake
     preostanek_kosi = {'Standard': 0, 'Večja': 0, 'Posebna': 0, '2-Metrska': 0, '2.9-Metrska': 0}
     for m in preostanek_tovora_mesta:
         preostanek_kosi[m['paleta'].ime] += m['kosi']
@@ -145,13 +135,11 @@ n_29m = st.sidebar.number_input(f"2.9-Metrske (Skupno število kosov)", min_valu
 skupno_kosov_vnos = n_std + n_vec + n_pos + n_2m + n_29m
 
 if skupno_kosov_vnos > 0:
-    # Izračun za kamion
     palete_kamion, manjka_kamion = izracunaj_parni_naklad(
         kamion, n_std, n_vec, n_pos, n_2m, n_29m, 
         pal_standard, pal_vecja, pal_posebna, pal_dvometerska, pal_trimeterska
     )
     
-    # Izračun za prikolico z ostankom tovora (če prikolica sploh obstaja)
     palete_prikolica = []
     manjka_skupaj = manjka_kamion.copy()
     
@@ -162,7 +150,6 @@ if skupno_kosov_vnos > 0:
             pal_standard, pal_vecja, pal_posebna, pal_dvometerska, pal_trimeterska
         )
         
-    # Kartice z rezultati
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric(label=f"Naloženo na {kamion.ime}", value=f"{len(palete_kamion)} kosov")
@@ -207,15 +194,18 @@ if skupno_kosov_vnos > 0:
             ax.text(start_xb + x + w/2, y + h/2, f"{ime}\nN{nivo}", color='black', ha='center', va='center', fontsize=7, weight='bold')
 
     # Legenda spodaj
+    legenda_elementi = [patches.Patch(facecolor=p.barva, edgecolor='#2b2d42', label=f"{p.ime} ({p.poraba_dolzine/100}m)") for p in baza_vseh_palet]
+    legenda_elementi.append(patches.Patch(facecolor='white', edgecolor='black', label='N1 = Spodnja paleta'))
+    legenda_elementi.append(patches.Patch(facecolor='white', edgecolor='black', hatch='///', label='N2 = Zgornja paleta (Zloženo)'))
 
-legenda_elementi = [patches.Patch(facecolor=p.barva, edgecolor='#2b2d42', label=f"{p.ime} ({p.poraba_dolzine/100}m)") for p in baza_vseh_palet]
-legenda_elementi.append(patches.Patch(facecolor='white', edgecolor='black', label='N1 = Spodnja paleta'))
-legenda_elementi.append(patches.Patch(facecolor='white', edgecolor='black', hatch='///', label='N2 = Zgornja paleta (Zloženo)'))
-skupna_dolzina = kamion.dolzina + (razmik + prikolica.dolzina if prikolica else 0)
-ax.set_xlim(-50, skupna_dolzina + 50)
-ax.set_ylim(-20, 260)
-ax.legend(handles=legenda_elementi, loc='upper center', bbox_to_anchor=(0.5, -0.18), ncol=3, fancybox=True, shadow=True)
-plt.tight_layout()
-st.pyplot(fig)
+    skupna_dolzina = kamion.dolzina + (razmik + prikolica.dolzina if prikolica else 0)
+    ax.set_xlim(-50, skupna_dolzina + 50)
+    ax.set_ylim(-20, 260)
+    
+    ax.legend(handles=legenda_elementi, loc='upper center', bbox_to_anchor=(0.5, -0.18), ncol=3, fancybox=True, shadow=True)
+    plt.tight_layout()
+    
+    st.pyplot(fig)
+
 else:
-st.info("💡 V stranski vrstici na levi strani izberite vrsto tovornjaka in vnesite količino palet za izračun.")
+    st.info("💡 V stranski vrstici na levi strani izberite vrsto tovornjaka in vnesite količino palet za izračun.")
