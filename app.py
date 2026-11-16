@@ -207,3 +207,15 @@ if skupno_kosov_vnos > 0:
             ax.text(start_xb + x + w/2, y + h/2, f"{ime}\nN{nivo}", color='black', ha='center', va='center', fontsize=7, weight='bold')
 
     # Legenda spodaj
+
+legenda_elementi = [patches.Patch(facecolor=p.barva, edgecolor='#2b2d42', label=f"{p.ime} ({p.poraba_dolzine/100}m)") for p in baza_vseh_palet]
+legenda_elementi.append(patches.Patch(facecolor='white', edgecolor='black', label='N1 = Spodnja paleta'))
+legenda_elementi.append(patches.Patch(facecolor='white', edgecolor='black', hatch='///', label='N2 = Zgornja paleta (Zloženo)'))
+skupna_dolzina = kamion.dolzina + (razmik + prikolica.dolzina if prikolica else 0)
+ax.set_xlim(-50, skupna_dolzina + 50)
+ax.set_ylim(-20, 260)
+ax.legend(handles=legenda_elementi, loc='upper center', bbox_to_anchor=(0.5, -0.18), ncol=3, fancybox=True, shadow=True)
+plt.tight_layout()
+st.pyplot(fig)
+else:
+st.info("💡 V stranski vrstici na levi strani izberite vrsto tovornjaka in vnesite količino palet za izračun.")
