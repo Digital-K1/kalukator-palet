@@ -24,58 +24,66 @@ class VrstaPalete:
         self.dvonivojsko = dvonivojsko
         self.vedno_dvonivojsko = vedno_dvonivojsko
 
-def izracunaj_parni_naklad(vozilo, n_std, n_vec, n_pos, n_2m, n_29m, pal_std, pal_vec, pal_pos, pal_2m, pal_29m):
+def izracunaj_parni_naklad_po_vrstnem_redu(vozilo, seznam_vnosov):
     """
-    Napredni algoritem za parno zlaganje, ki pravilno 'štosa' dvonivojske palete
-    in kombinira krajše palete za zapolnitev preostalega prostora.
+    Algoritem, ki strogo spoštuje vrstni red dodajanja palet.
+    Pravilno štosira dvonivojske palete in jih postavlja v pare brez vnaprejšnjega sortiranja.
     """
-    mesta_29m = math.ceil(n_29m / 2)
-    mesta_2m = math.ceil(n_2m / 2)
-    
     talna_mesta = []
+    zacasni_kos_29m = 0
+    zacasni_kos_2m = 0
     
-    # Dodamo mesta za 2.9-Metrske
-    za_razdelit_29m = n_29m
-    for _ in range(mesta_29m):
-        kosi = 2 if za_razdelit_29m >= 2 else 1
-        talna_mesta.append({'paleta': pal_29m, 'kosi': kosi})
-        za_razdelit_29m -= kosi
-        
-    # Dodamo mesta za 2-Metrske
-    za_razdelit_2m = n_2m
-    for _ in range(mesta_2m):
-        kosi = 2 if za_razdelit_2m >= 2 else 1
-        talna_mesta.append({'paleta': pal_2m, 'kosi': kosi})
-        za_razdelit_2m -= kosi
-        
-    # Enonivojske palete zasedejo vsaka svoje talno mesto
-    for _ in range(n_pos): talna_mesta.append({'paleta': pal_pos, 'kosi': 1})
-    for _ in range(n_vec): talna_mesta.append({'paleta': pal_vec, 'kosi': 1})
-    for _ in range(n_std): talna_mesta.append({'paleta': pal_std, 'kosi': 1})
-    
-    # Razvrstimo talna mesta od najdaljših proti najkrajšim
-    talna_mesta = sorted(talna_mesta, key=lambda x: x['paleta'].poraba_dolzine, reverse=True)
-    
+    # Prva faza: Gremo skozi vnose točno v zaporedju, kot so bili dodani,
+    # in tvorimo talna mesta (štosamo dvonivojske, enonivojske pa takoj dajo talno mesto)
+    for p in seznam_vnosov:
+        if p.ime == "2.9-Metrska":
+            zacasni_kos_29m += 1
+            if zacasni_kos_29m == 2:
+                talna_mesta.append({'paleta': p, 'kosi': 2})
+                zacasni_kos_29m = 0
+        elif p.ime == "2-Metrska":
+            zacasni_kos_2m += 1
+            if zacasni_kos_2m == 2:
+                talna_mesta.append({'paleta': p, 'kosi': 2})
+                zacasni_kos_2m = 0
+        else:
+            # Preden dodamo enonivojsko paleto, moramo zapreti morebitne osamljene dvonivojske palete na tleh
+            if zacasni_kos_29m == 1:
+                iskani = [x for x in seznam_vnosov if x.ime == "2.9-Metrska"]
+                talna_mesta.append({'paleta': iskani[0] if iskani else p, 'kosi': 1})
+                zacasni_kos_29m = 0
+            if zacasni_kos_2m == 1:
+                iskani = [x for x in seznam_vnosov if x.ime == "2-Metrska"]
+                talna_mesta.append({'paleta': iskani[0] if iskani else p, 'kosi': 1})
+                zacasni_kos_2m = 0
+                
+            talna_mesta.append({'paleta': p, 'kosi': 1})
+            
+    # Če je na koncu ostala še kakšna osamljena dvonivojska paleta (samo 1 kos v štosu)
+    if zacasni_kos_29m == 1:
+        iskani = [x for x in seznam_vnosov if x.ime == "2.9-Metrska"]
+        if iskani: talna_mesta.append({'paleta': iskani[0], 'kosi': 1})
+    if zacasni_kos_2m == 1:
+        iskani = [x for x in seznam_vnosov if x.ime == "2-Metrska"]
+        if iskani: talna_mesta.append({'paleta': iskani[0], 'kosi': 1})
+
     izbrane_palete = []
     preostanek_tovora_mesta = []
-    
     trenutni_x = 0
     
+    # Druga faza: Zlaganje pripravljenih talnih mest v pare (Leva in Desna stran)
     while len(talna_mesta) > 0:
         mesto1 = talna_mesta.pop(0)
         p1 = mesto1['paleta']
         
-        indeks_para = -1
-        for idx, m_potencialni in enumerate(talna_mesta):
-            if m_potencialni['paleta'].poraba_dolzine <= p1.poraba_dolzine:
-                indeks_para = idx
-                break
-                
-        mesto2 = talna_mesta.pop(indeks_para) if indeks_para != -1 else None
+        # Par ulovimo iz naslednjega elementa na listi (brez iskanja po celi bazi, da ostane vrstni red)
+        mesto2 = talna_mesta.pop(0) if len(talna_mesta) > 0 else None
         p2 = mesto2['paleta'] if mesto2 else None
         
         potrebna_dolzina = p1.poraba_dolzine
-        
+        if p2 and p2.poraba_dolzine > potrebna_dolzina:
+            potrebna_dolzina = p2.poraba_dolzine
+            
         if trenutni_x + potrebna_dolzina <= vozilo.dolzina:
             # Naložimo LEVO stran
             for nivo in range(1, mesto1['kosi'] + 1):
@@ -93,7 +101,7 @@ def izracunaj_parni_naklad(vozilo, n_std, n_vec, n_pos, n_2m, n_29m, pal_std, pa
                 preostanek_tovora_mesta.append(mesto2)
             preostanek_tovora_mesta.extend(talna_mesta)
             break
-            
+
     preostanek_kosi = {'Standard': 0, 'Večja': 0, 'Posebna': 0, '2-Metrska': 0, '2.9-Metrska': 0}
     for m in preostanek_tovora_mesta:
         preostanek_kosi[m['paleta'].ime] += m['kosi']
@@ -101,8 +109,8 @@ def izracunaj_parni_naklad(vozilo, n_std, n_vec, n_pos, n_2m, n_29m, pal_std, pa
     return izbrane_palete, preostanek_kosi
 
 # --- SPLETNI VMESNIK (UI) ---
-st.title("🚚 Parni Kalkulator in Načrtovalec Naklada Palet")
-st.write("Simetrično in ravno nakladanje s pametnim zlaganjem v višino (štosanjem) in kombiniranjem dolžin.")
+st.title("🚚 Parni Kalkulator Naklada Palet po Vrstnem Redu")
+st.write("Palete se zlagajo natančno v takšnem zaporedju, kot jih dodajate na listo (od kabine proti zadku).")
 
 # 1. Izbira tovornjaka
 st.sidebar.header("1. Izbira tovornega vozila")
@@ -122,34 +130,60 @@ pal_vecja = VrstaPalete("Večja", 1.40, 1.20, barva='#ffd166', dvonivojsko=False
 pal_posebna = VrstaPalete("Posebna", 1.50, 1.20, barva='#a8dadc', dvonivojsko=False)
 pal_dvometerska = VrstaPalete("2-Metrska", 2.00, 1.20, barva='#9bf6ff', vedno_dvonivojsko=True)
 pal_trimeterska = VrstaPalete("2.9-Metrska", 2.90, 1.20, barva='#bdb2ff', vedno_dvonivojsko=True)
-baza_vseh_palet = [pal_standard, pal_vecja, pal_posebna, pal_dvometerska, pal_trimeterska]
+baza_palet_dict = {
+    "Standard (1.25m)": pal_standard,
+    "Večja (1.40m)": pal_vecja,
+    "Posebna (1.50m)": pal_posebna,
+    "2-Metrska (vedno 2 nivoja)": pal_dvometerska,
+    "2.9-Metrska (vedno 2 nivoja)": pal_trimeterska
+}
 
-# 2. Vnos količin
-st.sidebar.header("2. Vnos količine palet (Kosi)")
-n_std = st.sidebar.number_input(f"Standardne (1.25m dolžina)", min_value=0, value=0, step=1)
-n_vec = st.sidebar.number_input(f"Večje (1.40m dolžina)", min_value=0, value=0, step=1)
-n_pos = st.sidebar.number_input(f"Posebne (1.50m dolžina)", min_value=0, value=0, step=1)
-n_2m = st.sidebar.number_input(f"2-Metrske (Skupno število kosov)", min_value=0, value=0, step=1)
-n_29m = st.sidebar.number_input(f"2.9-Metrske (Skupno število kosov)", min_value=0, value=0, step=1)
+# Seja za shranjevanje seznama dodanih palet
+if 'tovor_lista' not in st.session_state:
+    st.session_state.tovor_lista = []
 
-skupno_kosov_vnos = n_std + n_vec + n_pos + n_2m + n_29m
+# 2. Dinamično dodajanje palet na listo
+st.sidebar.header("2. Dodajanje palet na listo")
+izbran_tip_vnos = st.sidebar.selectbox("Izberite vrsto palete za dodajanje:", list(baza_palet_dict.keys()))
+kolicina_za_dodat = st.sidebar.number_input("Količina kosov za dodajanje:", min_value=1, value=1, step=1)
 
-if skupno_kosov_vnos > 0:
-    palete_kamion, manjka_kamion = izracunaj_parni_naklad(
-        kamion, n_std, n_vec, n_pos, n_2m, n_29m, 
-        pal_standard, pal_vecja, pal_posebna, pal_dvometerska, pal_trimeterska
-    )
+if st.sidebar.button("➕ Dodaj paleto na listo"):
+    paleta_obj = baza_palet_dict[izbran_tip_vnos]
+    for _ in range(kolicina_za_dodat):
+        st.session_state.tovor_lista.append(paleta_obj)
+    st.rerun()
+
+if st.sidebar.button("🗑️ Počisti celoten tovor"):
+    st.session_state.tovor_lista = []
+    st.rerun()
+
+# Prikaz trenutne liste naloženih stvari v stranski vrstici
+if len(st.session_state.tovor_lista) > 0:
+    st.sidebar.subheader("Trenutni tovor na listi:")
+    izpis_stevec = {}
+    for p in st.session_state.tovor_lista:
+        izpis_stevec[p.ime] = izpis_stevec.get(p.ime, 0) + 1
+    for k, v in izpis_stevec.items():
+        st.sidebar.write(f"- {v}x {k} paleta")
+
+# IZRAČUN IN GRAFIKA
+if len(st.session_state.tovor_lista) > 0:
+    palete_kamion, manjka_kamion = izracunaj_parni_naklad_po_vrstnem_redu(kamion, st.session_state.tovor_lista)
     
     palete_prikolica = []
     manjka_skupaj = manjka_kamion.copy()
     
     if prikolica and sum(manjka_kamion.values()) > 0:
-        palete_prikolica, manjka_skupaj = izracunaj_parni_naklad(
-            prikolica, manjka_kamion['Standard'], manjka_kamion['Večja'], manjka_kamion['Posebna'], 
-            manjka_kamion['2-Metrska'], manjka_kamion['2.9-Metrska'],
-            pal_standard, pal_vecja, pal_posebna, pal_dvometerska, pal_trimeterska
-        )
+        ostanek_za_prikolico = []
+        for _ in range(manjka_kamion['Standard']): ostanek_za_prikolico.append(pal_standard)
+        for _ in range(manjka_kamion['Večja']): ostanek_za_prikolico.append(pal_vecja)
+        for _ in range(manjka_kamion['Posebna']): ostanek_za_prikolico.append(pal_posebna)
+        for _ in range(manjka_kamion['2-Metrska']): ostanek_za_prikolico.append(pal_dvometerska)
+        for _ in range(manjka_kamion['2.9-Metrska']): ostanek_za_prikolico.append(pal_trimeterska)
         
+        palete_prikolica, manjka_skupaj = izracunaj_parni_naklad_po_vrstnem_redu(prikolica, ostanek_za_prikolico)
+        
+    # Prikaz rezultatov
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric(label=f"Naloženo na {kamion.ime}", value=f"{len(palete_kamion)} kosov")
@@ -162,11 +196,8 @@ if skupno_kosov_vnos > 0:
         skupno_manjka = sum(manjka_skupaj.values())
         if skupno_manjka > 0:
             st.error(f"⚠️ Zmanjkalo prostora za: {skupno_manjka} kosov")
-            for kljuc, vrednost in manjka_skupaj.items():
-                if vrednost > 0:
-                    st.write(f" - {vrednost}x {kljuc} paleta")
         else:
-            st.success("✅ Vse palete so uspešno naložene in poštopane!")
+            st.success("✅ Vse dodane palete so uspešno razporejene po vašem vrstnem redu!")
 
     # Izris grafike
     fig, ax = plt.subplots(figsize=(16, 5))
@@ -187,25 +218,20 @@ if skupno_kosov_vnos > 0:
         start_xb = kamion.dolzina + razmik
         ax.add_patch(patches.Rectangle((start_xb, 0), prikolica.dolzina, prikolica.sirina, linewidth=2, edgecolor='black', facecolor='none'))
         ax.plot([start_xb, start_xb + prikolica.dolzina], [120, 120], color='gray', linestyle=':', alpha=0.5)
-        
-        for (x, y, w, h, nivo, ime, barva) in palete_prikolica:
-            vzorec = '///' if nivo == 2 else None
-            ax.add_patch(patches.Rectangle((start_xb + x, y), w, h, linewidth=1, edgecolor='#2b2d42', facecolor=barva, hatch=vzorec, alpha=0.8))
-            ax.text(start_xb + x + w/2, y + h/2, f"{ime}\nN{nivo}", color='black', ha='center', va='center', fontsize=7, weight='bold')
-
-    # Legenda spodaj
-    legenda_elementi = [patches.Patch(facecolor=p.barva, edgecolor='#2b2d42', label=f"{p.ime} ({p.poraba_dolzine/100}m)") for p in baza_vseh_palet]
-    legenda_elementi.append(patches.Patch(facecolor='white', edgecolor='black', label='N1 = Spodnja paleta'))
-    legenda_elementi.append(patches.Patch(facecolor='white', edgecolor='black', hatch='///', label='N2 = Zgornja paleta (Zloženo)'))
-
-    skupna_dolzina = kamion.dolzina + (razmik + prikolica.dolzina if prikolica else 0)
-    ax.set_xlim(-50, skupna_dolzina + 50)
-    ax.set_ylim(-20, 260)
-    
-    ax.legend(handles=legenda_elementi, loc='upper center', bbox_to_anchor=(0.5, -0.18), ncol=3, fancybox=True, shadow=True)
-    plt.tight_layout()
-    
-    st.pyplot(fig)
-
+    for (x, y, w, h, nivo, ime, barva) in palete_prikolica:
+vzorec = '///' if nivo == 2 else None
+ax.add_patch(patches.Rectangle((start_xb + x, y), w, h, linewidth=1, edgecolor='#2b2d42', facecolor=barva, hatch=vzorec, alpha=0.8))
+ax.text(start_xb + x + w/2, y + h/2, f"{ime}\nN{nivo}", color='black', ha='center', va='center', fontsize=7, weight='bold')
+# Legenda spodaj
+baza_vseh_palet = [pal_standard, pal_vecja, pal_posebna, pal_dvometerska, pal_trimeterska]
+legenda_elementi = [patches.Patch(facecolor=p.barva, edgecolor='#2b2d42', label=f"{p.ime} ({p.poraba_dolzine/100}m)") for p in baza_vseh_palet]
+legenda_elementi.append(patches.Patch(facecolor='white', edgecolor='black', label='N1 = Spodnja paleta'))
+legenda_elementi.append(patches.Patch(facecolor='white', edgecolor='black', hatch='///', label='N2 = Zgornja paleta (Zloženo)'))
+skupna_dolzina = kamion.dolzina + (razmik + prikolica.dolzina if prikolica else 0)
+ax.set_xlim(-50, skupna_dolzina + 50)
+ax.set_ylim(-20, 260)
+ax.legend(handles=legenda_elementi, loc='upper center', bbox_to_anchor=(0.5, -0.18), ncol=3, fancybox=True, shadow=True)
+plt.tight_layout()
+st.pyplot(fig)
 else:
-    st.info("💡 V stranski vrstici na levi strani izberite vrsto tovornjaka in vnesite količino palet za izračun.")
+st.info("💡 V stranski vrstici na levi strani izberite vrsto palete in kliknite gumb 'Dodaj paleto na listo' za simulacijo vašega vrstnega reda nakladanja.")
